@@ -1,0 +1,12 @@
+node_modules
+.next
+out
+.codex-tools
+tsconfig.tsbuildinfo
+*.log
+*.err
+.env
+.env.local
+.env.*.local
+.env*
+!.env.example
