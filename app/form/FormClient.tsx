@@ -55,27 +55,26 @@ function formValue(formData: FormData, name: string) {
 
 function selectedFeatures(formData: FormData) {
   const customFeatures = formValue(formData, "customFeatures");
-  const checkedFeatures = formData
+  const features = formData
     .getAll("requiredFeatures")
     .filter((value): value is string => typeof value === "string" && value.trim() !== "")
     .filter((feature) => feature !== "기타");
 
   if (customFeatures) {
-    checkedFeatures.push(customFeatures);
+    features.push(customFeatures);
   }
 
-  return checkedFeatures;
+  return features;
 }
 
 function buildPayload(formData: FormData, accessCode: string): GenerateDocumentsRequest {
   const serviceType = formValue(formData, "serviceType");
-  const customServiceType = formValue(formData, "customServiceType");
   const customFeatures = formValue(formData, "customFeatures");
 
   return {
     accessCode,
-    serviceType: customServiceType || serviceType,
-    customServiceType,
+    serviceType,
+    customServiceType: serviceType,
     clientIndustry: formValue(formData, "clientIndustry"),
     requestText: formValue(formData, "requestText"),
     pageCount: formValue(formData, "pageCount"),
@@ -92,20 +91,18 @@ function buildPayload(formData: FormData, accessCode: string): GenerateDocuments
 }
 
 function findMissingFields(payload: GenerateDocumentsRequest) {
-  const missing = [
+  return [
     ["서비스 유형", payload.serviceType],
     ["고객 요청 원문", payload.requestText],
   ]
     .filter(([, value]) => !value)
     .map(([label]) => label);
-
-  return missing;
 }
 
 export default function FormClient({ orderId }: FormClientProps) {
   const router = useRouter();
+  const [isAccessReady, setIsAccessReady] = useState(true);
   const [isAccessGranted, setIsAccessGranted] = useState(false);
-  const [isAccessReady, setIsAccessReady] = useState(false);
   const [accessCodeInput, setAccessCodeInput] = useState("");
   const [storedAccessCode, setStoredAccessCode] = useState("");
   const [accessErrorMessage, setAccessErrorMessage] = useState("");
@@ -120,8 +117,8 @@ export default function FormClient({ orderId }: FormClientProps) {
     const granted = window.localStorage.getItem(BETA_ACCESS_GRANTED_KEY) === "true";
     const accessCode = window.localStorage.getItem(BETA_ACCESS_CODE_KEY) || "";
 
-    setIsAccessGranted(granted && Boolean(accessCode));
     setStoredAccessCode(accessCode);
+    setIsAccessGranted(granted && Boolean(accessCode));
     setIsAccessReady(true);
   }, []);
 
@@ -155,9 +152,7 @@ export default function FormClient({ orderId }: FormClientProps) {
     try {
       const response = await fetch("/api/verify-access-code", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ code }),
       });
       const data = (await response.json().catch(() => null)) as { ok?: boolean } | null;
@@ -212,12 +207,9 @@ export default function FormClient({ orderId }: FormClientProps) {
     try {
       const response = await fetch("/api/generate-documents", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-
       const data = (await response.json().catch(() => null)) as GeneratedDocuments | null;
 
       if (!response.ok || !data) {
@@ -268,9 +260,7 @@ export default function FormClient({ orderId }: FormClientProps) {
               />
             </label>
 
-            {accessErrorMessage ? (
-              <p className="checkout-error">{accessErrorMessage}</p>
-            ) : null}
+            {accessErrorMessage ? <p className="checkout-error">{accessErrorMessage}</p> : null}
 
             <div className="form-actions">
               <a className="secondary-button" href="/checkout">
@@ -290,7 +280,7 @@ export default function FormClient({ orderId }: FormClientProps) {
           </div>
         ) : null}
 
-        {isAccessReady && !isAccessGranted ? null : (
+        {isAccessReady && isAccessGranted ? (
           <>
             <div className="payment-order-notice">
               <span>{orderNotice.title}</span>
@@ -327,20 +317,12 @@ export default function FormClient({ orderId }: FormClientProps) {
 
                 <label className="field">
                   고객 업종
-                  <input
-                    name="clientIndustry"
-                    placeholder="예: 로컬 스튜디오, 병원, SaaS"
-                  />
+                  <input name="clientIndustry" placeholder="예: 로컬 스튜디오, 병원, SaaS" />
                 </label>
 
                 <label className="field">
                   페이지 수
-                  <input
-                    name="pageCount"
-                    inputMode="numeric"
-                    pattern="[0-9]*"
-                    placeholder="예: 5"
-                  />
+                  <input name="pageCount" inputMode="numeric" pattern="[0-9]*" placeholder="예: 5" />
                 </label>
 
                 <label className="field">
@@ -362,7 +344,8 @@ export default function FormClient({ orderId }: FormClientProps) {
               <label className="field field-full">
                 고객 요청 원문
                 <span className="field-hint">
-                  고객이 실제로 보낸 문의 내용을 그대로 붙여넣으면 더 정확한 문서가 생성됩니다.
+                  고객이 실제로 보낸 문의 내용을 그대로 붙여넣으면 더 정확한 문서가
+                  생성됩니다.
                 </span>
                 <textarea
                   name="requestText"
@@ -422,10 +405,7 @@ export default function FormClient({ orderId }: FormClientProps) {
               <div className="form-grid">
                 <label className="field">
                   지급 조건
-                  <input
-                    name="paymentTerms"
-                    placeholder="예: 착수금 50%, 완료 후 잔금 50%"
-                  />
+                  <input name="paymentTerms" placeholder="예: 착수금 50%, 완료 후 잔금 50%" />
                 </label>
 
                 <div className="field field-full">
@@ -469,7 +449,7 @@ export default function FormClient({ orderId }: FormClientProps) {
               </div>
             </form>
           </>
-        )}
+        ) : null}
       </section>
     </main>
   );
