@@ -1,4 +1,5 @@
 export type GenerateDocumentsRequest = {
+  accessCode?: string;
   serviceType: string;
   customServiceType?: string;
   clientIndustry: string;

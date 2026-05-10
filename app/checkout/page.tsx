@@ -72,6 +72,10 @@ export default function CheckoutPage() {
                 아래 입금 정보를 확인한 뒤 송금해 주세요. 카카오페이 송금은 아직 링크가
                 없어 필요한 경우 개별 안내로 진행합니다.
               </p>
+              <p>
+                입금 확인 후 베타 이용 코드를 개별 안내드립니다. 이용 코드를 입력해야
+                문서 생성 기능을 사용할 수 있습니다.
+              </p>
 
               <dl className="manual-payment-list">
                 <div>
@@ -102,13 +106,14 @@ export default function CheckoutPage() {
 
               <div className="checkout-alert">
                 입금 후 입력폼을 작성하면 운영자가 신청 내역과 입금 내역을 확인합니다.
+                입금 확인 후 베타 이용 코드를 개별 안내드립니다.
                 현재는 PG 자동 결제가 아닌 수동 입금 방식입니다. 정식 카드 결제는 추후
                 지원 예정입니다.
               </div>
 
               <div className="manual-apply-actions">
                 <a className="primary-button manual-apply-button" href="/form">
-                  입금 후 입력폼 작성하기
+                  입금 후 이용 코드 받기
                 </a>
                 <a className="secondary-button" href="/sample">
                   무료 샘플 보기

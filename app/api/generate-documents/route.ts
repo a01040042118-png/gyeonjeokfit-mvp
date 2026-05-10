@@ -150,6 +150,7 @@ function normalizeBody(body: Record<string, unknown>): GenerateDocumentsRequest 
   const customServiceType = asString(body.customServiceType);
 
   return {
+    accessCode: asString(body.accessCode),
     serviceType: customServiceType || serviceType,
     customServiceType,
     clientIndustry: asString(body.clientIndustry),
@@ -174,6 +175,16 @@ function validateRequired(input: GenerateDocumentsRequest) {
   ].filter(([, value]) => !value);
 
   return missingFields.map(([field]) => field);
+}
+
+function verifyBetaAccessCode(input: GenerateDocumentsRequest) {
+  const betaAccessCode = process.env.BETA_ACCESS_CODE;
+
+  if (!betaAccessCode) {
+    return { ok: false, status: 500 };
+  }
+
+  return { ok: input.accessCode === betaAccessCode, status: 403 };
 }
 
 function valueOrNeedsCheck(value: string) {
@@ -451,8 +462,25 @@ export async function POST(request: Request) {
   const missingFields = validateRequired(input);
   const model = process.env.OPENAI_MODEL || DEFAULT_MODEL;
   const apiKey = process.env.OPENAI_API_KEY;
+  const accessCodeCheck = verifyBetaAccessCode(input);
 
   logRequestSummary(input, model, Boolean(apiKey));
+
+  // TODO: Replace this MVP access-code gate with Supabase payment/login verification.
+  if (!accessCodeCheck.ok) {
+    if (accessCodeCheck.status === 500) {
+      console.error("[generate-documents] missing_beta_access_code");
+      return NextResponse.json(
+        { message: "베타 이용 코드 확인을 위한 서버 설정이 필요합니다." },
+        { status: 500 },
+      );
+    }
+
+    return NextResponse.json(
+      { message: "베타 이용 코드 확인이 필요합니다." },
+      { status: 403 },
+    );
+  }
 
   if (missingFields.length > 0) {
     console.warn("[generate-documents] validation_failed", { missingFields });
