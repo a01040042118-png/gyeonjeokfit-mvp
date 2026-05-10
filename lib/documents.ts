@@ -1,9 +1,11 @@
 export type GenerateDocumentsRequest = {
   serviceType: string;
+  customServiceType?: string;
   clientIndustry: string;
   requestText: string;
   pageCount: string;
   requiredFeatures: string[];
+  customFeatures?: string;
   budget: string;
   timeline: string;
   includedScope: string;
