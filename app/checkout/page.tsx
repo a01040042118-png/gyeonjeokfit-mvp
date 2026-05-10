@@ -88,7 +88,7 @@ export default function CheckoutPage() {
                 </div>
                 <div>
                   <dt>예금주</dt>
-                  <dd>입력 예정</dd>
+                  <dd>정지원</dd>
                 </div>
                 <div>
                   <dt>카카오페이 송금</dt>
