@@ -8,14 +8,13 @@ import {
   GenerateDocumentsRequest,
 } from "@/lib/documents";
 
-const serviceTypes = [
+const serviceQuickOptions = [
   "브랜드 웹사이트",
   "랜딩페이지",
   "쇼핑몰",
   "예약 사이트",
   "포트폴리오 사이트",
   "블로그/CMS",
-  "기타",
 ];
 
 const featureOptions = [
@@ -32,23 +31,14 @@ const featureOptions = [
   "기타",
 ];
 
-const documentTones = [
-  {
-    label: "전문적",
-    value: "professional",
-  },
-  {
-    label: "친근한",
-    value: "friendly",
-  },
-  {
-    label: "간결한",
-    value: "concise",
-  },
-  {
-    label: "프리미엄",
-    value: "premium",
-  },
+const toneQuickOptions = [
+  "전문적이고 신뢰감 있게",
+  "친근하고 쉽게",
+  "짧고 단정하게",
+  "고급스럽고 설득력 있게",
+  "B2B 제안서처럼",
+  "부드럽고 정중하게",
+  "실무적으로 명확하게",
 ];
 
 type FormClientProps = {
@@ -112,7 +102,8 @@ export default function FormClient({ orderId }: FormClientProps) {
   const router = useRouter();
   const [isGenerating, setIsGenerating] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
-  const [selectedServiceType, setSelectedServiceType] = useState("");
+  const [serviceTypeInput, setServiceTypeInput] = useState("");
+  const [toneInput, setToneInput] = useState("");
   const [isCustomFeatureChecked, setIsCustomFeatureChecked] = useState(false);
 
   const orderNotice = useMemo(() => {
@@ -186,34 +177,31 @@ export default function FormClient({ orderId }: FormClientProps) {
 
         <form className="request-form" onSubmit={handleSubmit}>
           <div className="form-grid">
-            <label className="field">
-              서비스 유형
-              <select
-                name="serviceType"
-                required
-                value={selectedServiceType}
-                onChange={(event) => setSelectedServiceType(event.target.value)}
-              >
-                <option value="" disabled>
-                  선택하세요
-                </option>
-                {serviceTypes.map((type) => (
-                  <option key={type} value={type}>
-                    {type}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            {selectedServiceType === "기타" ? (
-              <label className="field">
-                서비스 유형 직접 입력
-                <input
-                  name="customServiceType"
-                  placeholder="예: 회사 홈페이지 제작"
-                />
+            <div className="field field-full">
+              <label className="field-label" htmlFor="serviceType">
+                서비스 유형
               </label>
-            ) : null}
+              <input
+                id="serviceType"
+                name="serviceType"
+                placeholder="예: 회사 홈페이지 제작, 브랜드 웹사이트, 랜딩페이지"
+                required
+                value={serviceTypeInput}
+                onChange={(event) => setServiceTypeInput(event.target.value)}
+              />
+              <div className="checkbox-grid" aria-label="서비스 유형 빠른 선택">
+                {serviceQuickOptions.map((type) => (
+                  <button
+                    key={type}
+                    className="check-option quick-select-button"
+                    type="button"
+                    onClick={() => setServiceTypeInput(type)}
+                  >
+                    {type}
+                  </button>
+                ))}
+              </div>
+            </div>
 
             <label className="field">
               고객 업종
@@ -318,22 +306,30 @@ export default function FormClient({ orderId }: FormClientProps) {
               />
             </label>
 
-            <fieldset className="field-group tone-group">
-              <legend>문서 톤</legend>
-              <div className="tone-options">
-                {documentTones.map((tone) => (
-                  <label key={tone.value} className="radio-option">
-                    <input
-                      name="tone"
-                      type="radio"
-                      value={tone.label}
-                      defaultChecked={tone.value === "professional"}
-                    />
-                    <span>{tone.label}</span>
-                  </label>
+            <div className="field field-full">
+              <label className="field-label" htmlFor="tone">
+                문서 톤
+              </label>
+              <input
+                id="tone"
+                name="tone"
+                placeholder="예: 전문적이고 신뢰감 있게, 짧고 단정하게, 친근하지만 가볍지 않게"
+                value={toneInput}
+                onChange={(event) => setToneInput(event.target.value)}
+              />
+              <div className="checkbox-grid" aria-label="문서 톤 빠른 선택">
+                {toneQuickOptions.map((tone) => (
+                  <button
+                    key={tone}
+                    className="check-option quick-select-button"
+                    type="button"
+                    onClick={() => setToneInput(tone)}
+                  >
+                    {tone}
+                  </button>
                 ))}
               </div>
-            </fieldset>
+            </div>
           </div>
 
           {errorMessage ? <p className="checkout-error">{errorMessage}</p> : null}
