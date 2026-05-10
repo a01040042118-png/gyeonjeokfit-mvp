@@ -11,10 +11,11 @@ import {
 const serviceTypes = [
   "브랜드 웹사이트",
   "랜딩페이지",
-  "예약/문의형 웹사이트",
   "쇼핑몰",
-  "포트폴리오",
-  "기존 사이트 리뉴얼",
+  "예약 사이트",
+  "포트폴리오 사이트",
+  "블로그/CMS",
+  "기타",
 ];
 
 const featureOptions = [
@@ -28,6 +29,7 @@ const featureOptions = [
   "SEO 기본 세팅",
   "다국어",
   "외부 API 연동",
+  "기타",
 ];
 
 const documentTones = [
@@ -58,15 +60,33 @@ function formValue(formData: FormData, name: string) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function selectedFeatures(formData: FormData) {
+  const customFeatures = formValue(formData, "customFeatures");
+  const checkedFeatures = formData
+    .getAll("requiredFeatures")
+    .filter((value): value is string => typeof value === "string" && value.trim() !== "")
+    .filter((feature) => feature !== "기타");
+
+  if (customFeatures) {
+    checkedFeatures.push(customFeatures);
+  }
+
+  return checkedFeatures;
+}
+
 function buildPayload(formData: FormData): GenerateDocumentsRequest {
+  const serviceType = formValue(formData, "serviceType");
+  const customServiceType = formValue(formData, "customServiceType");
+  const customFeatures = formValue(formData, "customFeatures");
+
   return {
-    serviceType: formValue(formData, "serviceType"),
+    serviceType: customServiceType || serviceType,
+    customServiceType,
     clientIndustry: formValue(formData, "clientIndustry"),
     requestText: formValue(formData, "requestText"),
     pageCount: formValue(formData, "pageCount"),
-    requiredFeatures: formData
-      .getAll("requiredFeatures")
-      .filter((value): value is string => typeof value === "string" && value.trim() !== ""),
+    requiredFeatures: selectedFeatures(formData),
+    customFeatures,
     budget: formValue(formData, "budget"),
     timeline: formValue(formData, "timeline"),
     includedScope: formValue(formData, "includedScope"),
@@ -80,23 +100,10 @@ function buildPayload(formData: FormData): GenerateDocumentsRequest {
 function findMissingFields(payload: GenerateDocumentsRequest) {
   const missing = [
     ["서비스 유형", payload.serviceType],
-    ["고객 업종", payload.clientIndustry],
     ["고객 요청 원문", payload.requestText],
-    ["페이지 수", payload.pageCount],
-    ["예산", payload.budget],
-    ["희망 일정", payload.timeline],
-    ["포함 범위", payload.includedScope],
-    ["제외 범위", payload.excludedScope],
-    ["수정 횟수", payload.revisionCount],
-    ["지급 조건", payload.paymentTerms],
-    ["문서 톤", payload.tone],
   ]
     .filter(([, value]) => !value)
     .map(([label]) => label);
-
-  if (payload.requiredFeatures.length === 0) {
-    missing.push("필요한 기능");
-  }
 
   return missing;
 }
@@ -105,6 +112,8 @@ export default function FormClient({ orderId }: FormClientProps) {
   const router = useRouter();
   const [isGenerating, setIsGenerating] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [selectedServiceType, setSelectedServiceType] = useState("");
+  const [isCustomFeatureChecked, setIsCustomFeatureChecked] = useState(false);
 
   const orderNotice = useMemo(() => {
     if (!orderId) {
@@ -179,7 +188,12 @@ export default function FormClient({ orderId }: FormClientProps) {
           <div className="form-grid">
             <label className="field">
               서비스 유형
-              <select name="serviceType" required defaultValue="">
+              <select
+                name="serviceType"
+                required
+                value={selectedServiceType}
+                onChange={(event) => setSelectedServiceType(event.target.value)}
+              >
                 <option value="" disabled>
                   선택하세요
                 </option>
@@ -191,12 +205,21 @@ export default function FormClient({ orderId }: FormClientProps) {
               </select>
             </label>
 
+            {selectedServiceType === "기타" ? (
+              <label className="field">
+                서비스 유형 직접 입력
+                <input
+                  name="customServiceType"
+                  placeholder="예: 회사 홈페이지 제작"
+                />
+              </label>
+            ) : null}
+
             <label className="field">
               고객 업종
               <input
                 name="clientIndustry"
                 placeholder="예: 로컬 스튜디오, 병원, SaaS"
-                required
               />
             </label>
 
@@ -207,52 +230,30 @@ export default function FormClient({ orderId }: FormClientProps) {
                 inputMode="numeric"
                 pattern="[0-9]*"
                 placeholder="예: 5"
-                required
               />
             </label>
 
             <label className="field">
               예산
-              <select name="budget" required defaultValue="">
-                <option value="" disabled>
-                  선택하세요
-                </option>
-                <option value="100만원 미만">100만원 미만</option>
-                <option value="100만원-300만원">100만원-300만원</option>
-                <option value="300만원-500만원">300만원-500만원</option>
-                <option value="500만원-1,000만원">500만원-1,000만원</option>
-                <option value="1,000만원 이상">1,000만원 이상</option>
-                <option value="협의 필요">협의 필요</option>
-              </select>
+              <input name="budget" placeholder="예: 200만원, 100~300만원, 예산 미정" />
             </label>
 
             <label className="field">
               희망 일정
-              <select name="timeline" required defaultValue="">
-                <option value="" disabled>
-                  선택하세요
-                </option>
-                <option value="2주 이내">2주 이내</option>
-                <option value="3-4주">3-4주</option>
-                <option value="1-2개월">1-2개월</option>
-                <option value="2개월 이상">2개월 이상</option>
-                <option value="협의 필요">협의 필요</option>
-              </select>
+              <input name="timeline" placeholder="예: 4주, 3월 말까지, 일정 협의" />
             </label>
 
             <label className="field">
               수정 횟수
-              <select name="revisionCount" required defaultValue="2회">
-                <option value="1회">1회</option>
-                <option value="2회">2회</option>
-                <option value="3회">3회</option>
-                <option value="협의 필요">협의 필요</option>
-              </select>
+              <input name="revisionCount" placeholder="예: 2회, 3회, 협의 필요" />
             </label>
           </div>
 
           <label className="field field-full">
             고객 요청 원문
+            <span className="field-hint">
+              고객이 실제로 보낸 문의 내용을 그대로 붙여넣으면 더 정확한 문서가 생성됩니다.
+            </span>
             <textarea
               name="requestText"
               placeholder="고객이 보낸 메시지나 의뢰 내용을 그대로 붙여넣으세요."
@@ -265,11 +266,29 @@ export default function FormClient({ orderId }: FormClientProps) {
             <div className="checkbox-grid">
               {featureOptions.map((feature) => (
                 <label key={feature} className="check-option">
-                  <input name="requiredFeatures" type="checkbox" value={feature} />
+                  <input
+                    name="requiredFeatures"
+                    type="checkbox"
+                    value={feature}
+                    onChange={
+                      feature === "기타"
+                        ? (event) => setIsCustomFeatureChecked(event.target.checked)
+                        : undefined
+                    }
+                  />
                   <span>{feature}</span>
                 </label>
               ))}
             </div>
+            {isCustomFeatureChecked ? (
+              <label className="field custom-feature-field">
+                필요한 기능 직접 입력
+                <textarea
+                  name="customFeatures"
+                  placeholder="예: 제품 카탈로그, 다운로드 자료실, 시공 사례 페이지, 관리자 공지 등록 기능"
+                />
+              </label>
+            ) : null}
           </fieldset>
 
           <div className="form-grid">
@@ -277,8 +296,7 @@ export default function FormClient({ orderId }: FormClientProps) {
               포함 범위
               <textarea
                 name="includedScope"
-                placeholder="예: 기획, 디자인, 퍼블리싱, 기본 SEO, 문의 폼 연동"
-                required
+                placeholder="예: 기획, 디자인, 퍼블리싱, 반응형, 기본 SEO"
               />
             </label>
 
@@ -286,8 +304,7 @@ export default function FormClient({ orderId }: FormClientProps) {
               제외 범위
               <textarea
                 name="excludedScope"
-                placeholder="예: 사진 촬영, 원고 작성, 고급 마케팅 자동화, 유료 플러그인 비용"
-                required
+                placeholder="예: 로고 제작, 촬영, 서버 유지보수, 유료 플러그인 비용"
               />
             </label>
           </div>
@@ -295,20 +312,10 @@ export default function FormClient({ orderId }: FormClientProps) {
           <div className="form-grid">
             <label className="field">
               지급 조건
-              <select name="paymentTerms" required defaultValue="">
-                <option value="" disabled>
-                  선택하세요
-                </option>
-                <option value="계약금 50% / 잔금 50%">
-                  계약금 50% / 잔금 50%
-                </option>
-                <option value="착수금 30% / 중도금 40% / 잔금 30%">
-                  착수금 30% / 중도금 40% / 잔금 30%
-                </option>
-                <option value="선결제 100%">선결제 100%</option>
-                <option value="월 단위 분할 지급">월 단위 분할 지급</option>
-                <option value="협의 필요">협의 필요</option>
-              </select>
+              <input
+                name="paymentTerms"
+                placeholder="예: 착수금 50%, 완료 후 잔금 50%"
+              />
             </label>
 
             <fieldset className="field-group tone-group">
