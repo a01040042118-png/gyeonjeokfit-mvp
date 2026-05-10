@@ -29,6 +29,10 @@ const SYSTEM_PROMPT = `너는 한국의 웹 제작 프리랜서와 1인 에이�
 - 포함 범위와 제외 범위를 반드시 구분한다.
 - 입력값이 부족한 부분은 임의로 단정하지 말고 "확인 필요"라고 표시한다.
 - 금액, 일정, 수정 횟수, 지급 조건은 사용자가 입력한 값을 우선 사용한다.
+- 사용자가 직접 입력한 서비스 유형과 기능은 선택지보다 우선 반영한다.
+- 선택지와 직접 입력이 함께 있으면 직접 입력 내용을 더 구체적인 요구사항으로 본다.
+- 사용자가 입력한 예산, 일정, 포함 범위, 제외 범위는 임의로 바꾸지 않는다.
+- 입력값이 애매하면 "확인 필요"로 표시한다.
 
 견적서 작성 규칙:
 - 사용자가 예산을 입력한 경우, 총 견적 금액은 반드시 입력 예산을 기준으로 한다.
@@ -98,20 +102,34 @@ function asString(value: unknown) {
 
 function normalizeFeatures(value: unknown) {
   if (Array.isArray(value)) {
-    return value.filter((item): item is string => typeof item === "string" && item.trim() !== "");
+    return value
+      .filter((item): item is string => typeof item === "string" && item.trim() !== "")
+      .filter((item) => item.trim() !== "기타");
   }
 
   const singleValue = asString(value);
-  return singleValue ? [singleValue] : [];
+  return singleValue && singleValue !== "기타" ? [singleValue] : [];
+}
+
+function normalizeFeatureInput(body: Record<string, unknown>) {
+  const selectedFeatures = normalizeFeatures(body.requiredFeatures);
+  const customFeatures = asString(body.customFeatures);
+
+  return customFeatures ? [...selectedFeatures, customFeatures] : selectedFeatures;
 }
 
 function normalizeBody(body: Record<string, unknown>): GenerateDocumentsRequest {
+  const serviceType = asString(body.serviceType);
+  const customServiceType = asString(body.customServiceType);
+
   return {
-    serviceType: asString(body.serviceType),
+    serviceType: customServiceType || serviceType,
+    customServiceType,
     clientIndustry: asString(body.clientIndustry),
     requestText: asString(body.requestText),
     pageCount: asString(body.pageCount),
-    requiredFeatures: normalizeFeatures(body.requiredFeatures),
+    requiredFeatures: normalizeFeatureInput(body),
+    customFeatures: asString(body.customFeatures),
     budget: asString(body.budget),
     timeline: asString(body.timeline),
     includedScope: asString(body.includedScope),
@@ -125,41 +143,36 @@ function normalizeBody(body: Record<string, unknown>): GenerateDocumentsRequest 
 function validateRequired(input: GenerateDocumentsRequest) {
   const missingFields = [
     ["serviceType", input.serviceType],
-    ["clientIndustry", input.clientIndustry],
     ["requestText", input.requestText],
-    ["pageCount", input.pageCount],
-    ["budget", input.budget],
-    ["timeline", input.timeline],
-    ["includedScope", input.includedScope],
-    ["excludedScope", input.excludedScope],
-    ["revisionCount", input.revisionCount],
-    ["paymentTerms", input.paymentTerms],
-    ["tone", input.tone],
   ].filter(([, value]) => !value);
 
-  if (input.requiredFeatures.length === 0) {
-    missingFields.push(["requiredFeatures", ""]);
-  }
-
   return missingFields.map(([field]) => field);
+}
+
+function valueOrNeedsCheck(value: string) {
+  return value || "확인 필요";
+}
+
+function featuresOrNeedsCheck(features: string[]) {
+  return features.length ? features.join(", ") : "확인 필요";
 }
 
 function buildUserPrompt(input: GenerateDocumentsRequest) {
   return `아래 입력값을 바탕으로 결과 JSON을 생성해줘.
 
 입력값:
-- 서비스 유형: ${input.serviceType}
-- 고객 업종: ${input.clientIndustry}
-- 고객 요청 원문: ${input.requestText}
-- 페이지 수: ${input.pageCount}
-- 필요한 기능: ${input.requiredFeatures.join(", ")}
-- 예산: ${input.budget}
-- 희망 일정: ${input.timeline}
-- 포함 범위: ${input.includedScope}
-- 제외 범위: ${input.excludedScope}
-- 수정 횟수: ${input.revisionCount}
-- 지급 조건: ${input.paymentTerms}
-- 문서 톤: ${input.tone}
+- 서비스 유형: ${valueOrNeedsCheck(input.serviceType)}
+- 고객 업종: ${valueOrNeedsCheck(input.clientIndustry)}
+- 고객 요청 원문: ${valueOrNeedsCheck(input.requestText)}
+- 페이지 수: ${valueOrNeedsCheck(input.pageCount)}
+- 필요한 기능: ${featuresOrNeedsCheck(input.requiredFeatures)}
+- 예산: ${valueOrNeedsCheck(input.budget)}
+- 희망 일정: ${valueOrNeedsCheck(input.timeline)}
+- 포함 범위: ${valueOrNeedsCheck(input.includedScope)}
+- 제외 범위: ${valueOrNeedsCheck(input.excludedScope)}
+- 수정 횟수: ${valueOrNeedsCheck(input.revisionCount)}
+- 지급 조건: ${valueOrNeedsCheck(input.paymentTerms)}
+- 문서 톤: ${valueOrNeedsCheck(input.tone)}
 
 각 JSON 필드는 다음 의미로 채워줘.
 - summary: 의뢰 요약
@@ -171,14 +184,14 @@ function buildUserPrompt(input: GenerateDocumentsRequest) {
 
 estimate 필수 포함 내용:
 - 프로젝트명
-- 총 견적 금액: 입력 예산 "${input.budget}" 기준
+- 총 견적 금액: 입력 예산 "${valueOrNeedsCheck(input.budget)}" 기준
 - 세부 항목: 합계를 정확히 맞출 수 있을 때만 금액 표시, 아니면 항목명과 설명만 표시
 - VAT 포함 여부: 입력값에 없으면 "확인 필요"
 - 포함 범위
 - 제외 범위
-- 예상 일정: 입력 일정 "${input.timeline}" 기준
-- 수정 횟수: 입력 수정 횟수 "${input.revisionCount}" 기준
-- 지급 조건: 입력 지급 조건 "${input.paymentTerms}" 기준
+- 예상 일정: 입력 일정 "${valueOrNeedsCheck(input.timeline)}" 기준
+- 수정 횟수: 입력 수정 횟수 "${valueOrNeedsCheck(input.revisionCount)}" 기준
+- 지급 조건: 입력 지급 조건 "${valueOrNeedsCheck(input.paymentTerms)}" 기준
 
 contractTerms 필수 포함 내용:
 - "계약 핵심 조항 초안"이라는 표현
@@ -228,6 +241,37 @@ function parseGeneratedDocuments(text: string): GeneratedDocuments | null {
   } catch {
     return null;
   }
+}
+
+function buildInputAnchor(input: GenerateDocumentsRequest) {
+  const lines = [
+    ["서비스 유형", input.serviceType],
+    ["고객 업종", input.clientIndustry],
+    ["필요한 기능", featuresOrNeedsCheck(input.requiredFeatures)],
+    ["예산", input.budget],
+    ["희망 일정", input.timeline],
+    ["포함 범위", input.includedScope],
+    ["제외 범위", input.excludedScope],
+  ].filter(([, value]) => value && value !== "확인 필요");
+
+  if (!lines.length) {
+    return "";
+  }
+
+  return `입력 기준\n${lines.map(([label, value]) => `- ${label}: ${value}`).join("\n")}\n\n`;
+}
+
+function ensureInputAnchors(documents: GeneratedDocuments, input: GenerateDocumentsRequest) {
+  const anchor = buildInputAnchor(input);
+
+  if (!anchor || documents.summary.includes("입력 기준")) {
+    return documents;
+  }
+
+  return {
+    ...documents,
+    summary: `${anchor}${documents.summary}`,
+  };
 }
 
 function safeOpenAIError(error: unknown): SafeOpenAIError {
@@ -330,8 +374,10 @@ export async function POST(request: Request) {
       );
     }
 
+    const anchoredDocuments = ensureInputAnchors(documents, input);
+
     console.info("[generate-documents] success", { responseId: response.id });
-    return NextResponse.json(documents);
+    return NextResponse.json(anchoredDocuments);
   } catch (error) {
     console.error("[generate-documents] openai_failed", safeOpenAIError(error));
     return NextResponse.json(
